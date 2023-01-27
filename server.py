@@ -35,7 +35,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
         # #print ("Got a request of: %s\n" % self.data)
         # self.request.sendall(bytearray("OK",'utf-8'))
         self.status = "200 OK"
-        self.contentType = ""
+        self.contentType = "text/html"
         self.sock = self.request
 
         reqdatas = self.data.decode("utf-8").split()
