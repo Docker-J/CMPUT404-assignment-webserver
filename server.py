@@ -1,5 +1,6 @@
 #  coding: utf-8 
 import socketserver
+import os
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -28,50 +29,77 @@ import socketserver
 
 
 class MyWebServer(socketserver.BaseRequestHandler):
-    
+
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        #print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        # #print ("Got a request of: %s\n" % self.data)
+        # self.request.sendall(bytearray("OK",'utf-8'))
+        self.status = "200 OK"
+        self.contentType = ""
+        self.sock = self.request
 
-        sock = self.request
-        status = ""
+        reqdatas = self.data.decode("utf-8").split()
+        reqtype = reqdatas[0]
+        reqpath = os.path.abspath("www") + reqdatas[1]
 
-        reqdatas = self.data.split()
-        reqtype = reqdatas[0].decode()
-        reqpath = reqdatas[1].decode()
-        # contentType = reqdatas[1].rsplit('.',1)
-        contentType = "text/html"
-        # print(contentType)
-
-        if reqtype != "GET":
-            status = "405 Method Not Allowed"
-
-        if reqpath[-1] == "/":
-            reqpath = reqpath + "index.html"
+        #If the request method is other than GET, return "405 Method Not Allowed"
+        if reqtype == "GET":
+            self.file_handler(reqpath)
         else:
-            reqpath = reqpath + "/index.html"
-            status = "301 Moved Permanently"
+            self.status_handler(405)
 
-        filename = "www" + reqpath
-        print(reqdatas)
+    def status_handler(self, code, reqpath=None):
+        if code == 301:
+            self.status = "301 Moved Permanently"
+            reqpath += "/index.html"
+            if os.path.exists(reqpath):
+                self.file_handler(reqpath)
+
+        if code == 404:
+            self.status = "404 Not Found"
+            self.header_handler()
+
+        if code == 405:
+            self.status = "405 Method Not Allowed"
+            self.header_handler()
+
+    def file_handler(self, reqpath):
+        self.contentType = "text/html"
+        if os.path.exists(reqpath):
+            if os.path.isdir(reqpath):
+                if reqpath.endswith("/"):
+                    reqpath += "index.html"
+
+        self.content_handler(reqpath)
+    
+    def header_handler(self):
+        self.sock.sendall(str.encode(f"HTTP/1.1 {self.status}\r\n","utf-8"))
+        self.sock.sendall(str.encode(f"Content-Type: {self.contentType}\r\n", "utf-8"))
+        self.sock.sendall(str.encode("Connection: close\r\n", "utf-8"))
+        # self.sock.sendall(str.encode("\r\n", 'utf-8'))
+
+    def content_handler(self, reqpath):
+        if reqpath.endswith(".css"):
+            self.contentType = "text/css"
+        elif reqpath.endswith(".html"):
+            self.contentType = "text/html"
 
         try:
-            f = open(filename, 'r')
+            f = open(reqpath, 'r')
         except FileNotFoundError:
-            status = "404 Not FOUND"
-            sock.sendall(str.encode(f"HTTP/1.1 {status}\r\n","utf-8"))
-            sock.sendall(str.encode(f"Content-Type: {contentType}\r\n", "utf-8"))
-            sock.sendall(str.encode("Connection: close\r\n", "utf-8"))
-            sock.sendall(str.encode("\r\n", 'utf-8'))
-            f.close()
+            self.status_handler(404)
+        except IsADirectoryError:
+            self.status_handler(301, reqpath)
         else:
             l = f.read(1024)
             while (l):
-                sock.sendall(str.encode(f"HTTP/1.1 {status}\r\n","utf-8"))
-                sock.sendall(str.encode(f"Content-Type: {contentType}\r\n", "utf-8"))
-                sock.sendall(str.encode('\r\n'))
-                sock.sendall(str.encode(l, 'utf-8'))
+                self.sock.sendall(str.encode(f"HTTP/1.1 {self.status}\r\n","utf-8"))
+                self.sock.sendall(str.encode(f"Location: {reqpath}"))
+                self.sock.sendall(str.encode(f"Content-Type: {self.contentType}\r\n", "utf-8"))
+                # self.sock.sendall(str.encode(f"Content-Length: 0\r\n", "utf-8"))
+                self.sock.sendall(str.encode("Connection: close\r\n", "utf-8"))
+                self.sock.sendall(str.encode('\r\n'))
+                self.sock.sendall(str.encode(l, 'utf-8'))
                 l = f.read(1024)
             f.close()
 
