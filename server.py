@@ -64,11 +64,15 @@ class MyWebServer(socketserver.BaseRequestHandler):
             self.header_handler()
 
     def file_handler(self, reqpath):
-        self.contentType = "text/html"
         if os.path.exists(reqpath):
             if os.path.isdir(reqpath):
                 if reqpath.endswith("/"):
                     reqpath += "index.html"
+
+        if reqpath.endswith(".css"):
+            self.contentType = "text/css"
+        elif reqpath.endswith(".html"):
+            self.contentType = "text/html"
 
         self.content_handler(reqpath)
     
@@ -79,11 +83,6 @@ class MyWebServer(socketserver.BaseRequestHandler):
         # self.sock.sendall(str.encode("\r\n", 'utf-8'))
 
     def content_handler(self, reqpath):
-        if reqpath.endswith(".css"):
-            self.contentType = "text/css"
-        elif reqpath.endswith(".html"):
-            self.contentType = "text/html"
-
         try:
             f = open(reqpath, 'r')
         except FileNotFoundError:
