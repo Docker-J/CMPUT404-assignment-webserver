@@ -32,23 +32,25 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        # #print ("Got a request of: %s\n" % self.data)
+        print ("Got a request of: %s\n" % self.data)
         # self.request.sendall(bytearray("OK",'utf-8'))
         self.status = "200 OK"
         self.sock = self.request
 
         reqdatas = self.data.decode("utf-8").split()
-        reqtype = reqdatas[0]
 
-        reqpath = "www" + os.path.abspath(reqdatas[1])
-        if reqdatas[1].endswith("/"):
-            reqpath += "/"
+        if len(reqdatas):
+            reqtype = reqdatas[0]
+            reqpath = "www" + os.path.abspath(reqdatas[1])
+            if reqdatas[1].endswith("/"):
+                reqpath += "/"
 
-        #If the request method is other than GET, return "405 Method Not Allowed"
-        if reqtype == "GET":
-            self.file_handler(reqpath)
-        else:
-            self.status_handler(405)
+            #If the request method is other than GET, return "405 Method Not Allowed"
+            if reqtype == "GET":
+                self.file_handler(reqpath)
+            else:
+                self.status_handler(405)
+
 
     def status_handler(self, code, reqpath=None):
         if code == 301:
@@ -58,7 +60,8 @@ class MyWebServer(socketserver.BaseRequestHandler):
         if code == 405:
             self.status = "405 Method Not Allowed"
         
-        self.header_handler(reqpath)
+        self.error_handler(reqpath)
+
 
     def file_handler(self, reqpath):
         if os.path.exists(reqpath):
@@ -68,13 +71,15 @@ class MyWebServer(socketserver.BaseRequestHandler):
             self.content_handler(reqpath)
         else:
             self.status_handler(404)
+
                 
-    def header_handler(self, reqpath):
+    def error_handler(self, reqpath):
         self.sock.sendall(str.encode(f"HTTP/1.1 {self.status}\r\n","utf-8"))
         if reqpath != None:
             location = reqpath.lstrip("www") + "/"
             self.sock.sendall(str.encode(f"Location: {location}\r\n"))
         self.sock.sendall(str.encode("Connection: close\r\n\r\n", "utf-8"))
+
 
     def content_handler(self, reqpath):
         contentType = ""
@@ -92,18 +97,17 @@ class MyWebServer(socketserver.BaseRequestHandler):
         except IsADirectoryError:
             self.status_handler(301, reqpath)
         else:
-            l = f.read(1024)
             self.stauts = "200 OK"
+            l = f.read(1024)
             while (l):
                 self.sock.sendall(str.encode(f"HTTP/1.1 {self.status}\r\n","utf-8"))
                 self.sock.sendall(str.encode(f"Location: {location}\r\n"))
                 self.sock.sendall(str.encode(f"Content-Type: {contentType}\r\n", "utf-8"))
-                # self.sock.sendall(str.encode(f"Content-Length: 0\r\n", "utf-8"))
                 self.sock.sendall(str.encode("Connection: close\r\n\r\n", "utf-8"))
-                self.sock.sendall(str.encode(l, 'utf-8'))
+                self.sock.sendall(str.encode(l, "utf-8"))
                 l = f.read(1024)
             f.close()
-
+    
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
