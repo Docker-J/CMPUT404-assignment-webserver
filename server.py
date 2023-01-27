@@ -35,12 +35,14 @@ class MyWebServer(socketserver.BaseRequestHandler):
         # #print ("Got a request of: %s\n" % self.data)
         # self.request.sendall(bytearray("OK",'utf-8'))
         self.status = "200 OK"
-        self.contentType = "text/html"
         self.sock = self.request
 
         reqdatas = self.data.decode("utf-8").split()
         reqtype = reqdatas[0]
-        reqpath = os.path.abspath("www") + reqdatas[1]
+
+        reqpath = "www" + os.path.abspath(reqdatas[1])
+        if reqdatas[1].endswith("/"):
+            reqpath += "/"
 
         #If the request method is other than GET, return "405 Method Not Allowed"
         if reqtype == "GET":
@@ -51,38 +53,35 @@ class MyWebServer(socketserver.BaseRequestHandler):
     def status_handler(self, code, reqpath=None):
         if code == 301:
             self.status = "301 Moved Permanently"
-            reqpath += "/index.html"
-            if os.path.exists(reqpath):
-                self.file_handler(reqpath)
-
         if code == 404:
             self.status = "404 Not Found"
-            self.header_handler()
-
         if code == 405:
             self.status = "405 Method Not Allowed"
-            self.header_handler()
+        
+        self.header_handler()
 
     def file_handler(self, reqpath):
         if os.path.exists(reqpath):
             if os.path.isdir(reqpath):
                 if reqpath.endswith("/"):
                     reqpath += "index.html"
-
-        if reqpath.endswith(".css"):
-            self.contentType = "text/css"
-        elif reqpath.endswith(".html"):
-            self.contentType = "text/html"
-
-        self.content_handler(reqpath)
-    
+            self.content_handler(reqpath)
+        else:
+            self.status_handler(404)
+                
     def header_handler(self):
         self.sock.sendall(str.encode(f"HTTP/1.1 {self.status}\r\n","utf-8"))
-        self.sock.sendall(str.encode(f"Content-Type: {self.contentType}\r\n", "utf-8"))
-        self.sock.sendall(str.encode("Connection: close\r\n", "utf-8"))
-        # self.sock.sendall(str.encode("\r\n", 'utf-8'))
+        self.sock.sendall(str.encode("Connection: close\r\n\r\n", "utf-8"))
 
     def content_handler(self, reqpath):
+        contentType = ""
+        if reqpath.endswith(".css"):
+            contentType = "text/css"
+        elif reqpath.endswith(".html"):
+            contentType = "text/html"
+        
+        location = reqpath.lstrip("www")
+
         try:
             f = open(reqpath, 'r')
         except FileNotFoundError:
@@ -91,13 +90,13 @@ class MyWebServer(socketserver.BaseRequestHandler):
             self.status_handler(301, reqpath)
         else:
             l = f.read(1024)
+            self.stauts = "200 OK"
             while (l):
                 self.sock.sendall(str.encode(f"HTTP/1.1 {self.status}\r\n","utf-8"))
-                self.sock.sendall(str.encode(f"Location: {reqpath}"))
-                self.sock.sendall(str.encode(f"Content-Type: {self.contentType}\r\n", "utf-8"))
+                self.sock.sendall(str.encode(f"Location: {location}\r\n"))
+                self.sock.sendall(str.encode(f"Content-Type: {contentType}\r\n", "utf-8"))
                 # self.sock.sendall(str.encode(f"Content-Length: 0\r\n", "utf-8"))
-                self.sock.sendall(str.encode("Connection: close\r\n", "utf-8"))
-                self.sock.sendall(str.encode('\r\n'))
+                self.sock.sendall(str.encode("Connection: close\r\n\r\n", "utf-8"))
                 self.sock.sendall(str.encode(l, 'utf-8'))
                 l = f.read(1024)
             f.close()
