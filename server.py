@@ -58,7 +58,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
         if code == 405:
             self.status = "405 Method Not Allowed"
         
-        self.header_handler()
+        self.header_handler(reqpath)
 
     def file_handler(self, reqpath):
         if os.path.exists(reqpath):
@@ -69,8 +69,11 @@ class MyWebServer(socketserver.BaseRequestHandler):
         else:
             self.status_handler(404)
                 
-    def header_handler(self):
+    def header_handler(self, reqpath):
         self.sock.sendall(str.encode(f"HTTP/1.1 {self.status}\r\n","utf-8"))
+        if reqpath != None:
+            location = reqpath.lstrip("www") + "/"
+            self.sock.sendall(str.encode(f"Location: {location}\r\n"))
         self.sock.sendall(str.encode("Connection: close\r\n\r\n", "utf-8"))
 
     def content_handler(self, reqpath):
